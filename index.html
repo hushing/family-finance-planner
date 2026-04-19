@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="家庭财务规划可调参模型 - 在线计算退休规划、教育金、资产增长曲线，支持分段收益率、熊市模拟、通胀折算">
+<meta name="keywords" content="家庭财务规划,退休规划,教育金,资产增长,投资收益,通胀折算">
+<meta property="og:title" content="家庭财务规划可调参模型">
+<meta property="og:description" content="在线家庭财务规划工具，支持退休规划、教育金计算、资产增长模拟">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+<title>家庭财务规划可调参模型</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  /* 全局重置与基础样式 */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f3f4f6; color: #1f2937; line-height: 1.5; }
+  .container { max-width: 1280px; margin: 0 auto; padding: 16px; }
+
+  /* 头部 */
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .header h1 { font-size: 24px; font-weight: 700; color: #1f2937; }
+  .btn-reset { padding: 6px 14px; background: #e5e7eb; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; transition: background 0.2s; }
+  .btn-reset:hover { background: #d1d5db; }
+
+  /* 卡片通用 */
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 16px; margin-bottom: 16px; }
+  .card-title { font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+
+  /* 参数网格 */
+  .param-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .param-item { display: flex; flex-direction: column; }
+  .param-item label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+  .param-item label .tip { color: #9ca3af; margin-left: 4px; }
+  .param-input-wrap { display: flex; align-items: center; }
+  .param-input-wrap input { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; outline: none; transition: box-shadow 0.2s; }
+  .param-input-wrap input:focus { box-shadow: 0 0 0 2px #60a5fa; border-color: #93c5fd; }
+  .param-input-wrap .suffix { margin-left: 4px; font-size: 12px; color: #6b7280; white-space: nowrap; }
+
+  /* 指标卡片 */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi-card { border-radius: 10px; padding: 16px; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .kpi-card.blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+  .kpi-card.green { background: linear-gradient(135deg, #22c55e, #16a34a); }
+  .kpi-card.purple { background: linear-gradient(135deg, #a855f7, #9333ea); }
+  .kpi-card.orange { background: linear-gradient(135deg, #f97316, #ea580c); }
+  .kpi-label { font-size: 12px; opacity: 0.8; }
+  .kpi-value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+  .kpi-sub { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+
+  /* 图表容器 */
+  .chart-wrap { position: relative; width: 100%; }
+  .chart-wrap canvas { width: 100% !important; }
+
+  /* 教育金头部 */
+  .edu-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .edu-rate-wrap { display: flex; align-items: center; gap: 6px; }
+  .edu-rate-wrap label { font-size: 12px; color: #6b7280; }
+  .edu-rate-wrap input { width: 56px; padding: 3px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; outline: none; }
+  .edu-rate-wrap input:focus { box-shadow: 0 0 0 2px #60a5fa; }
+  .edu-rate-wrap span { font-size: 12px; color: #6b7280; }
+  .edu-note { font-size: 12px; color: #6b7280; margin-top: 8px; }
+
+  /* 表格 */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th { background: #f3f4f6; color: #374151; padding: 8px; text-align: left; font-weight: 600; white-space: nowrap; }
+  thead th.right { text-align: right; }
+  thead th.bg-blue { background: #eff6ff; }
+  thead th.bg-green { background: #f0fdf4; }
+  tbody td { padding: 6px 8px; border-bottom: 1px solid #f3f4f6; white-space: nowrap; }
+  tbody td.right { text-align: right; }
+  tbody td.bg-blue { background: #eff6ff; font-weight: 500; }
+  tbody td.bg-green { background: #f0fdf4; color: #4b5563; }
+  tbody tr:hover { background: #f9fafb; }
+  tbody tr.retire-row { background: #fffbeb; font-weight: 600; }
+  tbody tr.bear-row { background: #fef2f2; }
+  .text-blue { color: #2563eb; }
+  .text-red { color: #dc2626; }
+  .text-green { color: #16a34a; }
+
+  /* 使用说明 */
+  .tips-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; font-size: 13px; color: #374151; }
+  .tips-box h3 { font-weight: 600; color: #1e40af; margin-bottom: 8px; }
+  .tips-box ul { list-style: disc; padding-left: 20px; }
+  .tips-box li { margin-bottom: 4px; font-size: 12px; }
+  .tips-box b { color: #1f2937; }
+
+  /* 响应式 */
+  @media (max-width: 640px) {
+    .param-grid { grid-template-columns: repeat(2, 1fr); }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .header h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 头部 -->
+  <div class="header">
+    <h1>🏠 家庭财务规划可调参模型</h1>
+    <button class="btn-reset" onclick="resetDefaults()">重置默认值</button>
+  </div>
+
+  <!-- 参数控制区 -->
+  <div class="card">
+    <div class="card-title">📊 基础参数（单位：万元）</div>
+    <div class="param-grid">
+      <div class="param-item">
+        <label>当前年龄</label>
+        <div class="param-input-wrap"><input type="number" id="currentAge" value="35" step="1" onchange="recalc()"></div>
+      </div>
+      <div class="param-item">
+        <label>退休年龄</label>
+        <div class="param-input-wrap"><input type="number" id="retireAge" value="55" step="1" onchange="recalc()"></div>
+      </div>
+      <div class="param-item">
+        <label>规划终点年龄</label>
+        <div class="param-input-wrap"><input type="number" id="endAge" value="85" step="1" onchange="recalc()"></div>
+      </div>
+      <div class="param-item">
+        <label>起始投资资产</label>
+        <div class="param-input-wrap"><input type="number" id="initAsset" value="230" step="1" onchange="recalc()"><span class="suffix">万</span></div>
+      </div>
+      <div class="param-item">
+        <label>每年新增投入</label>
+        <div class="param-input-wrap"><input type="number" id="annualInvest" value="20" step="1" onchange="recalc()"><span class="suffix">万</span></div>
+      </div>
+      <div class="param-item">
+        <label>退休后每年提取</label>
+        <div class="param-input-wrap"><input type="number" id="annualWithdraw" value="64" step="1" onchange="recalc()"><span class="suffix">万</span></div>
+      </div>
+    </div>
+
+    <div class="card-title">📈 分段收益率（%）</div>
+    <div class="param-grid">
+      <div class="param-item">
+        <label>36-45岁 <span class="tip">(激进期)</span></label>
+        <div class="param-input-wrap"><input type="number" id="r1" value="8" step="0.5" onchange="recalc()"><span class="suffix">%</span></div>
+      </div>
+      <div class="param-item">
+        <label>46-55岁 <span class="tip">(平衡期)</span></label>
+        <div class="param-input-wrap"><input type="number" id="r2" value="7" step="0.5" onchange="recalc()"><span class="suffix">%</span></div>
+      </div>
+      <div class="param-item">
+        <label>56-65岁 <span class="tip">(稳健期)</span></label>
+        <div class="param-input-wrap"><input type="number" id="r3" value="6" step="0.5" onchange="recalc()"><span class="suffix">%</span></div>
+      </div>
+      <div class="param-item">
+        <label>66岁以后 <span class="tip">(保守期)</span></label>
+        <div class="param-input-wrap"><input type="number" id="r4" value="5" step="0.5" onchange="recalc()"><span class="suffix">%</span></div>
+      </div>
+    </div>
+
+    <div class="card-title">🛡️ 养老年金 + 通胀 + 熊市模拟</div>
+    <div class="param-grid">
+      <div class="param-item">
+        <label>年金领取起始</label>
+        <div class="param-input-wrap"><input type="number" id="annuityStartAge" value="55" step="1" onchange="recalc()"></div>
+      </div>
+      <div class="param-item">
+        <label>年金每年领取</label>
+        <div class="param-input-wrap"><input type="number" id="annuityAnnual" value="6" step="1" onchange="recalc()"><span class="suffix">万</span></div>
+      </div>
+      <div class="param-item">
+        <label>通胀率</label>
+        <div class="param-input-wrap"><input type="number" id="inflation" value="3" step="0.5" onchange="recalc()"><span class="suffix">%</span></div>
+      </div>
+      <div class="param-item">
+        <label>熊市第X年 <span class="tip">(0=无)</span></label>
+        <div class="param-input-wrap"><input type="number" id="bearYear" value="0" step="1" onchange="recalc()"></div>
+      </div>
+      <div class="param-item">
+        <label>熊市跌幅</label>
+        <div class="param-input-wrap"><input type="number" id="bearDrop" value="-30" step="1" onchange="recalc()"><span class="suffix">%</span></div>
+      </div>
+      <div class="param-item">
+        <label>教育金年投入</label>
+        <div class="param-input-wrap"><input type="number" id="eduAnnual" value="3" step="1" onchange="recalc()"><span class="suffix">万</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 关键指标卡 -->
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="kpi-card blue">
+      <div class="kpi-label" id="kpiRetireLabel">退休时（55岁）资产</div>
+      <div class="kpi-value" id="kpiRetireValue">0 万</div>
+      <div class="kpi-sub" id="kpiRetireSub">购买力：0 万（今日币值）</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label" id="kpiEndLabel">85岁终值</div>
+      <div class="kpi-value" id="kpiEndValue">0 万</div>
+      <div class="kpi-sub" id="kpiEndSub">购买力：0 万</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">峰值资产</div>
+      <div class="kpi-value" id="kpiPeakValue">0 万</div>
+      <div class="kpi-sub" id="kpiPeakSub">出现在 0 岁</div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-label">安全提取率</div>
+      <div class="kpi-value" id="kpiWithdrawRate">0%</div>
+      <div class="kpi-sub" id="kpiWithdrawSub">0万/0万</div>
+    </div>
+  </div>
+
+  <!-- 资产增长曲线 -->
+  <div class="card">
+    <div class="card-title">📉 资产增长曲线（名义值 vs 购买力）</div>
+    <div class="chart-wrap">
+      <canvas id="assetChart" height="320"></canvas>
+    </div>
+  </div>
+
+  <!-- 教育金图表 -->
+  <div class="card">
+    <div class="edu-header">
+      <div class="card-title" style="border:none;margin:0;padding:0;" id="eduTitle">🎓 教育金专户（每年投入 3万，一半给女儿一半给儿子）</div>
+      <div class="edu-rate-wrap">
+        <label>收益率：</label>
+        <input type="number" id="eduReturn" value="7" step="0.5" onchange="recalc()">
+        <span>%</span>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="eduChart" height="240"></canvas>
+    </div>
+    <p class="edu-note">说明：女儿5岁→18岁持续投入后开始领取8万/年读本科；儿子1岁→22岁持续投入（晚4年）。曲线负值代表教育金耗尽需从主账户补。</p>
+  </div>
+
+  <!-- 逐年明细表 -->
+  <div class="card">
+    <div class="card-title">📋 逐年现金流与资产明细（单位：万元）</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>年龄</th>
+            <th>年份</th>
+            <th class="right">期初资产</th>
+            <th class="right">投入</th>
+            <th class="right">提取</th>
+            <th class="right">年金收入</th>
+            <th class="right">收益率</th>
+            <th class="right">投资收益</th>
+            <th class="right bg-blue">期末资产</th>
+            <th class="right bg-green">购买力</th>
+          </tr>
+        </thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 使用说明 -->
+  <div class="tips-box">
+    <h3>💡 使用说明</h3>
+    <ul>
+      <li><b>基础参数</b>：修改当前年龄、退休年龄、初始资产、每年投入、退休后提取等，下方表格和图表会实时更新。</li>
+      <li><b>分段收益率</b>：按年龄段分为激进期/平衡期/稳健期/保守期，可根据自己的风险偏好调整。</li>
+      <li><b>熊市模拟</b>：在"熊市第X年"填入数字（如10），表示10年后（45岁）那一年按"熊市跌幅"计算，体验极端情景。填0代表无熊市。</li>
+      <li><b>通胀折算</b>：绿色"购买力"列是按今日币值折算后的真实购买力，对抗通胀幻觉。</li>
+      <li><b>安全提取率</b>：退休后每年提取金额 / 退休时资产。一般 ≤4% 非常安全，4-5% 可接受，&gt;5% 需警惕。</li>
+      <li><b>教育金专户</b>：独立计算，不影响主账户。负值代表教育金用完后需从主账户补充。</li>
+      <li><b>推荐测试场景</b>：① 收益率降1%测试保守情景；② 每年投入降到10万测试收入下降；③ 设置第10年熊市-40%测试抗风险；④ 退休年龄改成50或60对比差异。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+// ========== 读取参数 ==========
+function getParams() {
+  return {
+    currentAge:    parseFloat(document.getElementById('currentAge').value) || 0,
+    retireAge:     parseFloat(document.getElementById('retireAge').value) || 0,
+    endAge:        parseFloat(document.getElementById('endAge').value) || 0,
+    initAsset:     parseFloat(document.getElementById('initAsset').value) || 0,
+    annualInvest:  parseFloat(document.getElementById('annualInvest').value) || 0,
+    annualWithdraw:parseFloat(document.getElementById('annualWithdraw').value) || 0,
+    annuityStartAge: parseFloat(document.getElementById('annuityStartAge').value) || 0,
+    annuityAnnual: parseFloat(document.getElementById('annuityAnnual').value) || 0,
+    r1: parseFloat(document.getElementById('r1').value) || 0,
+    r2: parseFloat(document.getElementById('r2').value) || 0,
+    r3: parseFloat(document.getElementById('r3').value) || 0,
+    r4: parseFloat(document.getElementById('r4').value) || 0,
+    inflation:     parseFloat(document.getElementById('inflation').value) || 0,
+    bearYear:      parseFloat(document.getElementById('bearYear').value) || 0,
+    bearDrop:      parseFloat(document.getElementById('bearDrop').value) || 0,
+    eduAnnual:     parseFloat(document.getElementById('eduAnnual').value) || 0,
+    eduReturn:     parseFloat(document.getElementById('eduReturn').value) || 0,
+  };
+}
+
+// ========== 主表计算 ==========
+function calcMainData(p) {
+  const rows = [];
+  let asset = p.initAsset;
+  const baseYear = new Date().getFullYear() + 1;
+
+  for (let age = p.currentAge + 1; age <= p.endAge; age++) {
+    const year = baseYear + (age - p.currentAge - 1);
+    const yearIdx = age - p.currentAge;
+
+    // 分段收益率
+    let rate;
+    if (age <= 45) rate = p.r1;
+    else if (age <= 55) rate = p.r2;
+    else if (age <= 65) rate = p.r3;
+    else rate = p.r4;
+
+    // 熊市覆盖
+    if (p.bearYear > 0 && age === p.currentAge + p.bearYear) {
+      rate = p.bearDrop;
+    }
+
+    // 新投入（退休前）
+    const invest = age <= p.retireAge ? p.annualInvest : 0;
+
+    // 提取（退休后）
+    const withdraw = age > p.retireAge ? p.annualWithdraw : 0;
+
+    // 年金领取
+    const annuityIncome = age >= p.annuityStartAge ? p.annuityAnnual : 0;
+
+    // 净现金流
+    const netFlow = invest - withdraw + annuityIncome;
+
+    // 期中投入模型：先加资金再计息
+    const openBal = asset;
+    const avgBal = openBal + netFlow / 2;
+    const gain = avgBal * rate / 100;
+    asset = openBal + netFlow + gain;
+
+    // 通胀购买力折算
+    const realAsset = asset / Math.pow(1 + p.inflation / 100, yearIdx);
+
+    rows.push({
+      age, year,
+      openBal: +openBal.toFixed(1),
+      invest, withdraw, annuityIncome,
+      rate: rate.toFixed(1),
+      gain: +gain.toFixed(1),
+      endBal: +asset.toFixed(1),
+      realAsset: +realAsset.toFixed(1),
+    });
+  }
+  return rows;
+}
+
+// ========== 教育金计算 ==========
+function calcEduData(p) {
+  const rows = [];
+  let girl = 0, boy = 0;
+  for (let y = 1; y <= 22; y++) {
+    const girlAge = 5 + y;
+    const boyAge = 1 + y;
+    // 女儿：18岁前投入，18岁后每年领取8万
+    if (girlAge <= 18) girl = girl * (1 + p.eduReturn / 100) + p.eduAnnual * 0.5;
+    else girl = girl * (1 + p.eduReturn / 100) - 8;
+    // 儿子：22岁前投入，22岁后每年领取8万
+    if (boyAge <= 22) boy = boy * (1 + p.eduReturn / 100) + p.eduAnnual * 0.5;
+    else boy = boy * (1 + p.eduReturn / 100) - 8;
+    rows.push({
+      year: y, girlAge, boyAge,
+      girl: +girl.toFixed(1),
+      boy: +boy.toFixed(1),
+      total: +(girl + boy).toFixed(1),
+    });
+  }
+  return rows;
+}
+
+// ========== 图表实例 ==========
+let assetChartInstance = null;
+let eduChartInstance = null;
+
+// ========== 渲染函数 ==========
+function render() {
+  const p = getParams();
+  const data = calcMainData(p);
+  const eduData = calcEduData(p);
+
+  // 关键节点
+  const retireRow = data.find(d => d.age === p.retireAge);
+  const endRow = data[data.length - 1];
+  const peakRow = data.reduce((a, b) => a.endBal > b.endBal ? a : b, data[0]);
+
+  // 更新 KPI 卡片
+  document.getElementById('kpiRetireLabel').textContent = `退休时（${p.retireAge}岁）资产`;
+  document.getElementById('kpiRetireValue').textContent = `${retireRow ? retireRow.endBal : 0} 万`;
+  document.getElementById('kpiRetireSub').textContent = `购买力：${retireRow ? retireRow.realAsset : 0} 万（今日币值）`;
+
+  document.getElementById('kpiEndLabel').textContent = `${p.endAge}岁终值`;
+  document.getElementById('kpiEndValue').textContent = `${endRow ? endRow.endBal : 0} 万`;
+  document.getElementById('kpiEndSub').textContent = `购买力：${endRow ? endRow.realAsset : 0} 万`;
+
+  document.getElementById('kpiPeakValue').textContent = `${peakRow.endBal} 万`;
+  document.getElementById('kpiPeakSub').textContent = `出现在 ${peakRow.age} 岁`;
+
+  const wr = retireRow ? (p.annualWithdraw / retireRow.endBal * 100).toFixed(2) : '0.00';
+  document.getElementById('kpiWithdrawRate').textContent = `${wr}%`;
+  document.getElementById('kpiWithdrawSub').textContent = `${p.annualWithdraw}万/${retireRow ? retireRow.endBal : 0}万`;
+
+  // 更新教育金标题
+  document.getElementById('eduTitle').textContent = `🎓 教育金专户（每年投入 ${p.eduAnnual}万，一半给女儿一半给儿子）`;
+
+  // ---- 资产增长曲线 ----
+  const assetLabels = data.map(d => d.age);
+  const nominalData = data.map(d => d.endBal);
+  const realData = data.map(d => d.realAsset);
+
+  if (assetChartInstance) assetChartInstance.destroy();
+  const ctx1 = document.getElementById('assetChart').getContext('2d');
+  assetChartInstance = new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels: assetLabels,
+      datasets: [
+        {
+          label: '资产名义值',
+          data: nominalData,
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(59,130,246,0.15)',
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        },
+        {
+          label: '购买力',
+          data: realData,
+          borderColor: '#16a34a',
+          backgroundColor: 'transparent',
+          fill: false,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          borderDash: [],
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            title: (items) => `${items[0].label} 岁`,
+            label: (item) => `${item.dataset.label}: ${item.formattedValue} 万`,
+          }
+        },
+        // 退休线标注
+        annotation: undefined,
+      },
+      scales: {
+        x: {
+          title: { display: true, text: '年龄' },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+        },
+        y: {
+          title: { display: true, text: '万元' },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+        }
+      }
+    },
+    plugins: [{
+      // 自定义插件：绘制退休参考线
+      id: 'retireLine',
+      afterDraw(chart) {
+        const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
+        const labels = chart.data.labels;
+        const idx = labels.indexOf(p.retireAge);
+        if (idx < 0) return;
+        const x = xScale.getPixelForValue(idx);
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(x, yScale.top);
+        ctx.lineTo(x, yScale.bottom);
+        ctx.stroke();
+        // 标签
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`退休${p.retireAge}岁`, x, yScale.top - 4);
+        ctx.restore();
+      }
+    }]
+  });
+
+  // ---- 教育金曲线 ----
+  const eduLabels = eduData.map(d => d.year);
+  if (eduChartInstance) eduChartInstance.destroy();
+  const ctx2 = document.getElementById('eduChart').getContext('2d');
+  eduChartInstance = new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: eduLabels,
+      datasets: [
+        {
+          label: '女儿账户',
+          data: eduData.map(d => d.girl),
+          borderColor: '#ec4899',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        },
+        {
+          label: '儿子账户',
+          data: eduData.map(d => d.boy),
+          borderColor: '#3b82f6',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            title: (items) => `第 ${items[0].label} 年`,
+            label: (item) => `${item.dataset.label}: ${item.formattedValue} 万`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: '年后' },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+        },
+        y: {
+          title: { display: true, text: '万元' },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+        }
+      }
+    }
+  });
+
+  // ---- 逐年明细表 ----
+  const tbody = document.getElementById('detailBody');
+  let html = '';
+  data.forEach(d => {
+    const isRetire = d.age === p.retireAge;
+    const isBear = p.bearYear > 0 && d.age === p.currentAge + p.bearYear;
+    let cls = '';
+    if (isRetire) cls = 'retire-row';
+    if (isBear) cls = 'bear-row';
+
+    const ageMark = (isRetire ? ' 🎉' : '') + (isBear ? ' 🐻' : '');
+    const investStr = d.invest > 0 ? `+${d.invest}` : '-';
+    const withdrawStr = d.withdraw > 0 ? `-${d.withdraw}` : '-';
+    const annuityStr = d.annuityIncome > 0 ? `+${d.annuityIncome}` : '-';
+    const gainCls = d.gain >= 0 ? 'text-green' : 'text-red';
+    const gainStr = (d.gain > 0 ? '+' : '') + d.gain;
+
+    html += `<tr class="${cls}">
+      <td>${d.age}${ageMark}</td>
+      <td>${d.year}</td>
+      <td class="right">${d.openBal}</td>
+      <td class="right text-blue">${investStr}</td>
+      <td class="right text-red">${withdrawStr}</td>
+      <td class="right text-green">${annuityStr}</td>
+      <td class="right">${d.rate}%</td>
+      <td class="right ${gainCls}">${gainStr}</td>
+      <td class="right bg-blue">${d.endBal}</td>
+      <td class="right bg-green">${d.realAsset}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ========== 重置默认值 ==========
+function resetDefaults() {
+  const defaults = {
+    currentAge: 35, retireAge: 55, endAge: 85,
+    initAsset: 230, annualInvest: 20, annualWithdraw: 64,
+    annuityStartAge: 55, annuityAnnual: 6,
+    r1: 8, r2: 7, r3: 6, r4: 5,
+    inflation: 3, bearYear: 0, bearDrop: -30,
+    eduAnnual: 3, eduReturn: 7,
+  };
+  for (const [id, val] of Object.entries(defaults)) {
+    document.getElementById(id).value = val;
+  }
+  recalc();
+}
+
+// ========== 统一重算入口 ==========
+function recalc() {
+  render();
+}
+
+// ========== 初始化 ==========
+document.addEventListener('DOMContentLoaded', () => {
+  render();
+});
+</script>
+
+</body>
+</html>
