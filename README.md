@@ -3,7 +3,7 @@
 一个纯前端的交互式家庭财务规划工具，支持退休规划、教育金计算、资产增长模拟。所有计算在浏览器本地完成，无需后端服务。
 
 **在线演示**：
-- 国内访问：[https://workspace-two-ebon-85.vercel.app](https://workspace-two-ebon-85.vercel.app)（Vercel）
+- 国内访问：[https://hushing66.gitee.io/family-finance-planner](https://hushing66.gitee.io/family-finance-planner)（Gitee Pages）
 - 国际访问：[https://hushing.github.io/family-finance-planner/](https://hushing.github.io/family-finance-planner/)（GitHub Pages）
 
 ## 功能特性
@@ -29,7 +29,7 @@
 
 - 纯 HTML + CSS + JavaScript，单文件，零依赖构建
 - [Chart.js](https://www.chartjs.org/)（CDN 加载）用于图表渲染
-- 部署于 GitHub Pages + Vercel（国内可访问）
+- 部署于 GitHub Pages + Gitee Pages（国内可访问）
 
 ## 本地运行
 
