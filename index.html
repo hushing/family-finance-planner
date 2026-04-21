@@ -125,7 +125,7 @@
       </div>
       <div class="param-item">
         <label>起始投资资产</label>
-        <div class="param-input-wrap"><input type="number" id="initAsset" value="230" step="1" onchange="recalc()"><span class="suffix">万</span></div>
+        <div class="param-input-wrap"><input type="number" id="initAsset" value="200" step="1" onchange="recalc()"><span class="suffix">万</span></div>
       </div>
       <div class="param-item">
         <label>每年新增投入</label>
@@ -240,7 +240,7 @@
     <!-- 教育金图表 -->
     <div class="card">
       <div class="edu-header">
-        <div class="card-title" style="border:none;margin:0;padding:0;" id="eduTitle">🎓 教育金专户（每年投入 3万，一半给女儿一半给儿子）</div>
+        <div class="card-title" style="border:none;margin:0;padding:0;" id="eduTitle">🎓 教育金专户</div>
         <div class="edu-rate-wrap">
           <label>收益率：</label>
           <input type="number" id="eduReturn" value="7" step="0.5" onchange="recalc()">
@@ -505,12 +505,14 @@ function render() {
   document.getElementById('kpiWithdrawSub').textContent = `${p.annualWithdraw}万/${retireRow ? retireRow.endBal : 0}万`;
 
   // 更新教育金标题
+  document.getElementById('eduTitle').textContent = `🎓 教育金专户`;
+  // 更新教育金说明
   if (children.length === 0) {
-    document.getElementById('eduTitle').textContent = `🎓 教育金专户（未配置子女）`;
+    document.getElementById('eduNote').textContent = `说明：未配置子女。请在上方"子女配置"中添加孩子信息。`;
   } else {
     const perChild = (p.eduAnnual / children.length).toFixed(1);
     const childDesc = children.map(c => `${c.name}(${c.age}岁)`).join('、');
-    document.getElementById('eduTitle').textContent = `🎓 教育金专户（每年${p.eduAnnual}万，${childDesc}，每人${perChild}万/年）`;
+    document.getElementById('eduNote').textContent = `说明：每年投入${p.eduAnnual}万，${childDesc}，每人${perChild}万/年。每个孩子独立账户，18岁前持续投入，18岁后每年领取8万（本科/研究生）。曲线负值代表教育金耗尽需从主账户补。`;
   }
 
   // ---- 资产增长曲线 ----
@@ -710,7 +712,7 @@ function render() {
 function resetDefaults() {
   const defaults = {
     currentAge: 35, retireAge: 55, endAge: 85,
-    initAsset: 230, annualInvest: 20, annualWithdraw: 64,
+    initAsset: 200, annualInvest: 20, annualWithdraw: 64,
     annuityStartAge: 55, annuityAnnual: 6,
     r1: 8, r2: 7, r3: 6, r4: 5,
     inflation: 3, bearYear: 0, bearDrop: -30,
