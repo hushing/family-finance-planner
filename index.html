@@ -33,8 +33,8 @@
   .param-item label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
   .param-item label .tip { color: #9ca3af; margin-left: 4px; }
   .param-input-wrap { display: flex; align-items: center; }
-  .param-input-wrap input { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; outline: none; transition: box-shadow 0.2s; }
-  .param-input-wrap input:focus { box-shadow: 0 0 0 2px #60a5fa; border-color: #93c5fd; }
+  .param-input-wrap input, .param-input-wrap select { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; outline: none; transition: box-shadow 0.2s; }
+  .param-input-wrap input:focus, .param-input-wrap select:focus { box-shadow: 0 0 0 2px #60a5fa; border-color: #93c5fd; }
   .param-input-wrap .suffix { margin-left: 4px; font-size: 12px; color: #6b7280; white-space: nowrap; }
 
   /* 指标卡片 */
@@ -184,6 +184,23 @@
         <div class="param-input-wrap"><input type="number" id="eduAnnual" value="3" step="1" onchange="recalc()"><span class="suffix">万</span></div>
       </div>
     </div>
+
+    <div class="card-title">👶 子女配置</div>
+    <div class="param-grid" id="childrenGrid">
+      <div class="param-item">
+        <label>孩子数量</label>
+        <div class="param-input-wrap">
+          <select id="childCount" onchange="updateChildrenUI(); recalc();">
+            <option value="0">0 个</option>
+            <option value="1">1 个</option>
+            <option value="2" selected>2 个</option>
+            <option value="3">3 个</option>
+            <option value="4">4 个</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="param-grid" id="childrenDetail"></div>
   </div>
 
   <!-- 关键指标卡 -->
@@ -233,7 +250,7 @@
       <div class="chart-wrap">
         <canvas id="eduChart" height="240"></canvas>
       </div>
-      <p class="edu-note">说明：女儿5岁→18岁持续投入后开始领取8万/年读本科；儿子1岁→22岁持续投入（晚4年）。曲线负值代表教育金耗尽需从主账户补。</p>
+      <p class="edu-note" id="eduNote">说明：每个孩子独立账户，18岁前持续投入，18岁后每年领取8万（本科/研究生）。曲线负值代表教育金耗尽需从主账户补。</p>
     </div>
   </div>
 
@@ -277,6 +294,63 @@
 </div>
 
 <script>
+// ========== 子女配置 UI ==========
+const CHILD_COLORS = ['#ec4899', '#3b82f6', '#f59e0b', '#10b981'];
+const CHILD_NAMES_DEFAULT = ['女儿', '儿子', '老三', '老四'];
+const CHILD_DEFAULTS = [
+  { gender: 'girl', age: 5 },
+  { gender: 'boy', age: 1 },
+  { gender: 'girl', age: 0 },
+  { gender: 'boy', age: 0 },
+];
+
+function updateChildrenUI() {
+  const count = parseInt(document.getElementById('childCount').value) || 0;
+  const container = document.getElementById('childrenDetail');
+  if (count === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    const d = CHILD_DEFAULTS[i] || { gender: 'girl', age: 0 };
+    html += `
+      <div class="param-item">
+        <label>孩子${i + 1} 性别</label>
+        <div class="param-input-wrap">
+          <select id="childGender${i}" onchange="recalc()">
+            <option value="girl" ${d.gender === 'girl' ? 'selected' : ''}>👧 女</option>
+            <option value="boy" ${d.gender === 'boy' ? 'selected' : ''}>👦 男</option>
+          </select>
+        </div>
+      </div>
+      <div class="param-item">
+        <label>孩子${i + 1} 当前年龄</label>
+        <div class="param-input-wrap"><input type="number" id="childAge${i}" value="${d.age}" step="1" min="0" max="25" onchange="recalc()"><span class="suffix">岁</span></div>
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+}
+
+function getChildren() {
+  const count = parseInt(document.getElementById('childCount').value) || 0;
+  const children = [];
+  for (let i = 0; i < count; i++) {
+    const genderEl = document.getElementById(`childGender${i}`);
+    const ageEl = document.getElementById(`childAge${i}`);
+    if (genderEl && ageEl) {
+      children.push({
+        gender: genderEl.value,
+        age: parseInt(ageEl.value) || 0,
+        color: CHILD_COLORS[i],
+        name: CHILD_NAMES_DEFAULT[i] || `孩子${i + 1}`,
+      });
+    }
+  }
+  return children;
+}
+
 // ========== 读取参数 ==========
 function getParams() {
   return {
@@ -357,24 +431,43 @@ function calcMainData(p) {
 }
 
 // ========== 教育金计算 ==========
-function calcEduData(p) {
+function calcEduData(p, children) {
+  if (!children || children.length === 0) return [];
+
+  // 计算需要的最大年数
+  let maxYears = 0;
+  children.forEach(c => {
+    const yearsNeeded = 22 - c.age + 4; // 投入到22岁后还要显示几年
+    if (yearsNeeded > maxYears) maxYears = yearsNeeded;
+  });
+  maxYears = Math.max(maxYears, 5);
+
   const rows = [];
-  let girl = 0, boy = 0;
-  for (let y = 1; y <= 22; y++) {
-    const girlAge = 5 + y;
-    const boyAge = 1 + y;
-    // 女儿：18岁前投入，18岁后每年领取8万
-    if (girlAge <= 18) girl = girl * (1 + p.eduReturn / 100) + p.eduAnnual * 0.5;
-    else girl = girl * (1 + p.eduReturn / 100) - 8;
-    // 儿子：22岁前投入，22岁后每年领取8万
-    if (boyAge <= 22) boy = boy * (1 + p.eduReturn / 100) + p.eduAnnual * 0.5;
-    else boy = boy * (1 + p.eduReturn / 100) - 8;
-    rows.push({
-      year: y, girlAge, boyAge,
-      girl: +girl.toFixed(1),
-      boy: +boy.toFixed(1),
-      total: +(girl + boy).toFixed(1),
+  // 每个孩子一个独立账户
+  const accounts = children.map(() => 0);
+  const perChild = children.length > 0 ? p.eduAnnual / children.length : 0;
+
+  for (let y = 1; y <= maxYears; y++) {
+    const row = { year: y, children: {} };
+    children.forEach((child, i) => {
+      const childAge = child.age + y;
+      let bal = accounts[i];
+      // 投入阶段：18岁前每年投入
+      if (childAge <= 18) {
+        bal = bal * (1 + p.eduReturn / 100) + perChild;
+      } else {
+        // 领取阶段：18岁后每年领取8万（本科4年+研究生等）
+        bal = bal * (1 + p.eduReturn / 100) - 8;
+      }
+      accounts[i] = bal;
+      row.children[child.name] = {
+        age: childAge,
+        bal: +bal.toFixed(1),
+        color: child.color,
+      };
     });
+    row.total = +accounts.reduce((s, v) => s + v, 0).toFixed(1);
+    rows.push(row);
   }
   return rows;
 }
@@ -386,8 +479,9 @@ let eduChartInstance = null;
 // ========== 渲染函数 ==========
 function render() {
   const p = getParams();
+  const children = getChildren();
   const data = calcMainData(p);
-  const eduData = calcEduData(p);
+  const eduData = calcEduData(p, children);
 
   // 关键节点
   const retireRow = data.find(d => d.age === p.retireAge);
@@ -411,7 +505,13 @@ function render() {
   document.getElementById('kpiWithdrawSub').textContent = `${p.annualWithdraw}万/${retireRow ? retireRow.endBal : 0}万`;
 
   // 更新教育金标题
-  document.getElementById('eduTitle').textContent = `🎓 教育金专户（每年投入 ${p.eduAnnual}万，一半给女儿一半给儿子）`;
+  if (children.length === 0) {
+    document.getElementById('eduTitle').textContent = `🎓 教育金专户（未配置子女）`;
+  } else {
+    const perChild = (p.eduAnnual / children.length).toFixed(1);
+    const childDesc = children.map(c => `${c.name}(${c.age}岁)`).join('、');
+    document.getElementById('eduTitle').textContent = `🎓 教育金专户（每年${p.eduAnnual}万，${childDesc}，每人${perChild}万/年）`;
+  }
 
   // ---- 资产增长曲线 ----
   const assetLabels = data.map(d => d.age);
@@ -510,32 +610,41 @@ function render() {
   const eduLabels = eduData.map(d => d.year);
   if (eduChartInstance) eduChartInstance.destroy();
   const ctx2 = document.getElementById('eduChart').getContext('2d');
+
+  // 动态生成每个孩子的数据集
+  const eduDatasets = [];
+  if (children.length > 0) {
+    children.forEach(child => {
+      eduDatasets.push({
+        label: `${child.name}账户`,
+        data: eduData.map(d => d.children[child.name] ? d.children[child.name].bal : 0),
+        borderColor: child.color,
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+      });
+    });
+    // 合计线
+    eduDatasets.push({
+      label: '合计',
+      data: eduData.map(d => d.total),
+      borderColor: '#6b7280',
+      backgroundColor: 'transparent',
+      borderDash: [5, 3],
+      tension: 0.3,
+      borderWidth: 1.5,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+    });
+  }
+
   eduChartInstance = new Chart(ctx2, {
     type: 'line',
     data: {
       labels: eduLabels,
-      datasets: [
-        {
-          label: '女儿账户',
-          data: eduData.map(d => d.girl),
-          borderColor: '#ec4899',
-          backgroundColor: 'transparent',
-          tension: 0.3,
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-        },
-        {
-          label: '儿子账户',
-          data: eduData.map(d => d.boy),
-          borderColor: '#3b82f6',
-          backgroundColor: 'transparent',
-          tension: 0.3,
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-        }
-      ]
+      datasets: eduDatasets,
     },
     options: {
       responsive: true,
@@ -610,6 +719,8 @@ function resetDefaults() {
   for (const [id, val] of Object.entries(defaults)) {
     document.getElementById(id).value = val;
   }
+  document.getElementById('childCount').value = '2';
+  updateChildrenUI();
   recalc();
 }
 
@@ -620,6 +731,7 @@ function recalc() {
 
 // ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
+  updateChildrenUI();
   render();
 });
 </script>
